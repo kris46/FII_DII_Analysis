@@ -1,8 +1,8 @@
 name: Deploy NSE OI Dashboard
 
-# Deploy ONLY when dashboard source code changes.
-# CSV data updates do NOT require a redeploy — the browser fetches the
-# latest nse_oi_dashboard.csv from GitHub raw URL on every page visit.
+# Deploys ONLY when dashboard source code changes.
+# CSV data updates need NO redeploy — browser fetches nse_oi_dashboard.csv
+# live from GitHub raw URL on every page visit.
 on:
   push:
     branches: [main]
@@ -15,27 +15,33 @@ permissions:
   pages:    write
   id-token: write
 
+# Prevent duplicate deployments.
+# cancel-in-progress: false is intentional — killing a deploy mid-flight
+# leaves a ghost "github-pages" artifact that causes the duplicate error.
+# Instead we queue and let the previous run finish.
 concurrency:
-  group: pages
-  cancel-in-progress: true
+  group: github-pages
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # silence Node 20 deprecation
 
 jobs:
-  build-and-deploy:
+  # ── Job 1: build ──────────────────────────────────────────────────────────
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: dashboard/package-lock.json
 
-      - name: Install
+      - name: Install dependencies
         working-directory: ./dashboard
         run: npm ci
 
@@ -43,10 +49,19 @@ jobs:
         working-directory: ./dashboard
         run: npm run build
 
-      - uses: actions/upload-pages-artifact@v3
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
           path: ./dashboard/dist
 
-      - name: Deploy
+  # ── Job 2: deploy (needs build to finish first) ───────────────────────────
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
