@@ -1,0 +1,4 @@
+{
+  "csvUrl": "https://raw.githubusercontent.com/kris46/FII_DII_Analysis/blob/main/nse_oi_dashboard.csv",
+  "note": "Change YOUR_USERNAME and YOUR_REPO above. This file points to the PRE-PROCESSED csv (nse_oi_dashboard.csv), NOT the raw one."
+}
